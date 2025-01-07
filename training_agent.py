@@ -11,7 +11,9 @@ class SimpleDQN(nn.Module):
     def __init__(self, state_size, action_size):
         super(SimpleDQN, self).__init__()
         self.network = nn.Sequential(
-            nn.Linear(state_size, 32),
+            nn.Linear(state_size, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
             nn.ReLU(),
             nn.Linear(32, action_size)
         )
@@ -20,7 +22,7 @@ class SimpleDQN(nn.Module):
         return self.network(x)
 
 class DQNAgent:
-    def __init__(self, state_size, action_size):
+    def __init__(self, state_size=9, action_size=4):
         # Basic setup
         self.state_size = state_size
         self.action_size = action_size
@@ -40,6 +42,19 @@ class DQNAgent:
         
         # Experience replay
         self.memory = deque(maxlen=2000)
+        
+    def get_state(self, env, pos):
+        x, y = pos
+        state = []
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                new_x, new_y = x + dx, y + dy
+                if (0 <= new_x < len(env.maze[0]) and 
+                    0 <= new_y < len(env.maze[1])):
+                    state.append(float(env.maze[new_x][new_y]))
+                else:
+                    state.append(1.0)  # Treat out-of-bounds as walls
+        return np.array(state)
         
     def store_transition(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
@@ -92,24 +107,23 @@ class DQNAgent:
         
         return loss.item()
 
-    def train_agent(self, env, agent, episodes=200, max_steps=1000):
+    def train_agent(self, env, episodes=200, max_steps=1000):
         training_history = []
         
         for episode in range(episodes):
-            state = env.reset()
+            state = self.get_state(env, env.reset())
             total_reward = 0
             
             for step in range(max_steps):
-                # Choose and perform action
                 action = self.choose_action(state)
-                next_state, reward, done, _ = env.step(action)
+                next_pos, reward, done, _ = env.step(action)
+                next_state = self.get_state(env, next_pos)
                 
                 # Store transition and train
                 self.store_transition(state, action, reward, next_state, done)
                 self.train()
 
-                # Decay epsilon
-                if step%100 == 0: 
+                if step % 100 == 0:
                     self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
                 
                 total_reward += reward
@@ -118,20 +132,18 @@ class DQNAgent:
                 if done:
                     break
             
-            # Store episode statistics
             training_history.append({
                 'episode': episode,
                 'total_reward': total_reward,
                 'epsilon': self.epsilon
             })
             
-            
-            print(f"Episode {episode + 1}/{episodes}, Total Reward: {total_reward:.2f}, Epsilon: {self.epsilon:.2f}, Steps: {step}")
+            if (episode + 1) % 10 == 0:
+                print(f"Episode {episode + 1}/{episodes}, Total Reward: {total_reward:.2f}, Epsilon: {self.epsilon:.2f}")
         
         return training_history
 
 if __name__ == "__main__":
-    # Create maze environment
     maze = [
         [0, 1, 0, 0, 0],
         [0, 1, 0, 1, 0],
@@ -140,14 +152,6 @@ if __name__ == "__main__":
         [0, 0, 0, 1, 0]
     ]
     env = SimpleMazeEnv(maze)
-    
-    # Initialize agent
-    state_size = 2  # x and y coordinates
-    action_size = 4  # up, down, left, right
-    agent = DQNAgent(state_size, action_size)
-    
-    # Train agent
-    history = agent.train_agent(env, agent)
-    
-    # Save the trained model
-    torch.save(agent.model.state_dict(), 'output/dqn_maze_solver.pth')
+    agent = DQNAgent()
+    history = agent.train_agent(env)
+    torch.save(agent.model.state_dict(), 'dqn_maze_solver.pth')
