@@ -2,7 +2,7 @@
 
 ![alt text](agent_movement_2024.gif)
 
-A Deep Q-Network (DQN) implementation that learns to navigate through a maze environment using PyTorch. This is an extension of a solution for the same problem with [basic q-learning](https://github.com/Davidwarchy/rl)
+A Deep Q-Network (DQN) implementation that learns to navigate through a maze environment using reinforcement learning. This is an extension of a solution for the same problem with [basic q-learning](https://github.com/Davidwarchy/rl)
 
 ## Overview
 
